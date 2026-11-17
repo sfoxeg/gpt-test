@@ -1,4 +1,5 @@
-from sqlalchemy import Boolean, ForeignKey, String, Text, UniqueConstraint
+from datetime import datetime, timezone
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.models.base import Base
 from core.models.mixins import IdPKMixin, CreatedAtMixin
@@ -13,6 +14,7 @@ class ChatMembersOrm(IdPKMixin, Base):
     __tablename__ = "chat_members"
     chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    joined: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     chat: Mapped[ChatsOrm] = relationship(back_populates="members")
     __table_args__ = (UniqueConstraint("chat_id", "user_id"),)
 
