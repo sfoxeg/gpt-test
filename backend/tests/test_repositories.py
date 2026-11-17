@@ -45,8 +45,11 @@ async def test_chat_message_flow_and_membership(test_db):
         await session.commit()
         first, second = users[0].id, users[1].id
     chat = await ChatsRepository.create(first, second)
+    duplicate = await ChatsRepository.create(first, second)
+    assert duplicate["id"] == chat["id"]
     sent = await ChatsRepository.send_message(chat["id"], first, SMessageIn(text="Hello"))
     history = await ChatsRepository.messages(chat["id"], second)
     assert sent.text == "Hello"
     assert len(history) == 1 and history[0].sender_id == first
+    assert history[0].is_read is True
     assert (await ChatsRepository.list_for_user(first))[0]["id"] == chat["id"]
