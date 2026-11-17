@@ -1,17 +1,32 @@
 # CatchMe backend
 
-Backend architecture is based on the layered style used in ClimDate:
+Layered async FastAPI backend inspired by ClimDate. HTTP routers, repositories, ORM models, Pydantic schemas, settings and dependencies are separated.
 
-- `api/v1/routers`: HTTP routing and request/response boundaries.
-- `core/repositories`: async database operations and persistence queries.
-- `core/models`: SQLAlchemy ORM entities, declarative base and mixins.
-- `core/schemas`: Pydantic request/response contracts.
-- `core/settings`: separate application and database configuration.
-- `core/dependencies.py`: authentication dependencies.
-- `core/database.py`: async engine and session factory.
+## Database migrations
 
-All database access uses SQLAlchemy async sessions via `async with new_session()`; PostgreSQL uses asyncpg.
+Alembic owns the database schema. The application no longer creates tables at startup.
 
-Run with Docker Compose from the repository root. API docs: http://localhost:8000/docs.
+- Apply migrations: `docker compose up --build` (backend container runs `alembic upgrade head` before Uvicorn).
+- Apply manually: `cd backend && alembic upgrade head`.
+- Current revision: `0001_initial`.
+- Inspect current revision: `alembic current`.
+- Generate a revision after model changes: `alembic revision --autogenerate -m "describe change"`.
+- Roll back one revision: `alembic downgrade -1`.
 
-Alembic is included as the migration dependency. Before production, add and apply migrations rather than relying on the development `create_all` bootstrap.
+For an existing database previously created with `create_all`, take a backup first. If it already has the exact schema represented by revision `0001_initial`, mark it as managed with `alembic stamp 0001_initial` rather than applying the initial migration on top of existing tables. Verify the schema before stamping.
+
+## Tests
+
+Tests use an isolated in-memory SQLite database and do not touch the development PostgreSQL volume.
+
+```bash
+cd backend
+pip install -r requirements.txt
+pytest -q
+```
+
+The suite covers repository persistence/search/chat flows and HTTP API registration, login, authenticated profile access/update and authorization.
+
+## Runtime
+
+Run from repository root with `docker compose up --build`. API docs: http://localhost:8000/docs.
