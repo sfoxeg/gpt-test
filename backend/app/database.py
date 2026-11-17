@@ -1,23 +1,37 @@
+from collections.abc import AsyncIterator
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import DeclarativeBase
+
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+psycopg://catchme:catchme@db:5432/catchme"
+    database_url: str = "postgresql+asyncpg://catchme:catchme@db:5432/catchme"
     secret_key: str = "change-this-secret-in-production"
     access_token_minutes: int = 60 * 24
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+
 settings = Settings()
-engine = create_engine(settings.database_url, pool_pre_ping=True)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+# SQLAlchemy 2 async engine and session factory.
+engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+SessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    autoflush=False,
+    expire_on_commit=False,
+)
+
 
 class Base(DeclarativeBase):
     pass
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+
+async def get_db() -> AsyncIterator[AsyncSession]:
+    async with SessionLocal() as session:
+        yield session
