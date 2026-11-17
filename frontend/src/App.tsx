@@ -25,9 +25,11 @@ function App(){
   const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState('')
   const [birth,setBirth]=useState('1995-01-01'),[sex,setSex]=useState('false'),[register,setRegister]=useState(false)
   const [error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false)
-  const headers={'Content-Type':'application/json',Authorization:'Bearer '+token}
   const request=useCallback(async(path:string,init:RequestInit={})=>{
-    const response=await fetch(API+path,{...init,headers:{...headers,...(init.headers||{})}})
+    const mergedHeaders=new Headers(init.headers)
+    if(!mergedHeaders.has('Content-Type') && !(init.body instanceof URLSearchParams)) mergedHeaders.set('Content-Type','application/json')
+    if(token) mergedHeaders.set('Authorization','Bearer '+token)
+    const response=await fetch(API+path,{...init,headers:mergedHeaders})
     const body=await response.json().catch(()=>({}))
     if(!response.ok) throw new Error(body.detail||'Ошибка запроса ('+response.status+')')
     return body
