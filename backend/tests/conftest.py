@@ -9,6 +9,7 @@ from core.models import Base
 import core.repositories.auth as auth_repo
 import core.repositories.profiles as profiles_repo
 import core.repositories.chats as chats_repo
+import core.realtime as realtime
 import core.dependencies as dependencies
 from core.database import new_session as production_session
 from main import app
@@ -35,7 +36,7 @@ async def test_db():
         await connection.run_sync(Base.metadata.create_all)
 
     factory = async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
-    for module in (auth_repo, profiles_repo, chats_repo, dependencies):
+    for module in (auth_repo, profiles_repo, chats_repo, dependencies, realtime):
         module.new_session = factory
 
     try:
