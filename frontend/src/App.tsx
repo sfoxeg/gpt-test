@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Preferences } from '@capacitor/preferences'
 
@@ -7,7 +7,7 @@ type Climbing = { leading:number; where_leading:number; bouldering:number; where
 type Profile = { user_id:number; first_name:string; last_name:string; city:string|null; description:string; goal:number; date_of_birth:string; sex:boolean; avatar:string|null; climbing:Climbing }
 type Me = { id:number; email:string; profile:Omit<Profile,'climbing'|'date_of_birth'|'sex'|'avatar'> & {avatar:string|null}; climbing:Climbing }
 type Chat = { id:number; members:number[] }
-type Message = { id:number; chat_id:number; sender_id:number; text:string; created_at:string }
+type Message = { id:number; chat_id:number; sender_id:number; text:string; is_read?:boolean; created_at:string }
 const emptyClimbing:Climbing = {leading:0,where_leading:0,bouldering:0,where_bouldering:0,speed:false,alpinism:false,belay:0,belay_description:''}
 const grades=['—','5','6a/a+','6b/b+','6c/c+','7a/a+','7b/b','7c/c+','8a/a+','8b/b','8c/c+','9+']
 type Tab='discover'|'chats'|'profile'
@@ -21,6 +21,8 @@ function App(){
   const [tab,setTab]=useState<Tab>('discover'),[me,setMe]=useState<Me|null>(null)
   const [profiles,setProfiles]=useState<Profile[]>([]),[chats,setChats]=useState<Chat[]>([])
   const [activeChat,setActiveChat]=useState<number|null>(null),[messages,setMessages]=useState<Message[]>([])
+  const [presence,setPresence]=useState<Record<string,boolean>>({}),[typingUser,setTypingUser]=useState<number|null>(null)
+  const socketRef=useRef<WebSocket|null>(null)
   const [draft,setDraft]=useState(''),[city,setCity]=useState(''),[lookingFor,setLookingFor]=useState('')
   const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState('')
   const [birth,setBirth]=useState('1995-01-01'),[sex,setSex]=useState('false'),[register,setRegister]=useState(false)
@@ -43,7 +45,28 @@ function App(){
   const loadMessages=useCallback(async(id:number)=>{setMessages(await request('/chats/'+id+'/messages'))},[request])
   useEffect(()=>{readToken().then(value=>{setToken(value);setReady(true)})},[])
   useEffect(()=>{if(!token)return;Promise.all([refreshMe(),loadProfiles(),loadChats()]).catch(e=>setError(e.message))},[token,refreshMe,loadProfiles,loadChats])
-  useEffect(()=>{if(activeChat!==null){loadMessages(activeChat).catch(e=>setError(e.message))}},[activeChat,loadMessages])
+  useEffect(()=>{
+    if(!token)return
+    const wsBase=API.replace(/^http/,'ws').replace(/\/api\/v1$/,'/api/v1/ws')
+    const socket=new WebSocket(wsBase+'?token='+encodeURIComponent(token))
+    socketRef.current=socket
+    socket.onmessage=(event)=>{
+      try{
+        const data=JSON.parse(event.data)
+        if(data.type==='message' && data.message){
+          const incoming=data.message as Message
+          if(activeChat===incoming.chat_id)setMessages(old=>old.some(m=>m.id===incoming.id)?old:[...old,incoming])
+          else loadChats().catch(()=>{})
+        }else if(data.type==='presence')setPresence(old=>({...old,[String(data.user_id)]:!!data.online}))
+        else if(data.type==='messages.read' && activeChat===data.chat_id)setMessages(old=>old.map(m=>m.sender_id===me?.id?{...m,is_read:true}:m))
+        else if(data.type==='typing' && activeChat===data.chat_id)setTypingUser(data.active?data.user_id:null)
+      }catch{/* Ignore malformed socket frames. */}
+    }
+    socket.onclose=()=>{if(socketRef.current===socket)socketRef.current=null}
+    return ()=>{socket.close();if(socketRef.current===socket)socketRef.current=null}
+  },[token,activeChat,me?.id,loadChats])
+
+  useEffect(()=>{if(activeChat!==null){loadMessages(activeChat).catch(e=>setError(e.message));request('/chats/'+activeChat+'/presence').then(setPresence).catch(()=>{})}},[activeChat,loadMessages,request])
   async function authenticate(e:FormEvent){
     e.preventDefault();setBusy(true);setError('')
     try{
@@ -55,7 +78,8 @@ function App(){
   }
   async function logout(){await clearToken();setToken('');setMe(null);setProfiles([]);setChats([]);setActiveChat(null)}
   async function startChat(userId:number){try{const chat=await request('/chats?other_user_id='+userId,{method:'POST'});await loadChats();setActiveChat(chat.id);setTab('chats');setError('')}catch(e){setError(e instanceof Error?e.message:'Не удалось создать чат')}}
-  async function sendMessage(e:FormEvent){e.preventDefault();if(!activeChat||!draft.trim())return;try{await request('/chats/'+activeChat+'/messages',{method:'POST',body:JSON.stringify({text:draft.trim()})});setDraft('');await loadMessages(activeChat)}catch(e){setError(e instanceof Error?e.message:'Не удалось отправить сообщение')}}
+  async function sendMessage(e:FormEvent){e.preventDefault();if(!activeChat||!draft.trim())return;try{await request('/chats/'+activeChat+'/messages',{method:'POST',body:JSON.stringify({text:draft.trim()})});setDraft('');}catch(e){setError(e instanceof Error?e.message:'Не удалось отправить сообщение')}}
+  function updateDraft(value:string){setDraft(value);if(activeChat!==null&&socketRef.current?.readyState===WebSocket.OPEN)socketRef.current.send(JSON.stringify({type:'typing',chat_id:activeChat,active:!!value}))}
   if(!ready)return <div className="splash">C<span>M</span></div>
   if(!token)return <main className="auth-page"><div className="auth-panel"><div className="brand large">C<span>M</span></div><p className="eyebrow">CLIMB TOGETHER</p><h1>Напарник для<br/><em>больших высот.</em></h1><p className="muted">Находи людей, с которыми хочется исследовать новые маршруты.</p><form onSubmit={authenticate} className="stack">
     {register&&<><label>Имя<input value={first} onChange={e=>setFirst(e.target.value)} required maxLength={32}/></label><label>Фамилия<input value={last} onChange={e=>setLast(e.target.value)} required maxLength={32}/></label><label>Дата рождения<input type="date" value={birth} onChange={e=>setBirth(e.target.value)} required/></label><label>Пол<select value={sex} onChange={e=>setSex(e.target.value)}><option value="false">Мужской</option><option value="true">Женский</option></select></label></>}
@@ -67,7 +91,7 @@ function App(){
       {notice&&<div className="notice">{notice}<button onClick={()=>setNotice('')}>×</button></div>}
       {tab==='discover'&&<><p className="eyebrow">ТВОЁ СЛЕДУЮЩЕЕ ПРИКЛЮЧЕНИЕ</p><h1>Найди своего<br/><em>человека.</em></h1><p className="muted">Ищи тех, кто разделяет твою любовь к высоте.</p><section className="filter-panel"><label>Город<input value={city} onChange={e=>setCity(e.target.value)} placeholder="Любой город"/></label><label>Кого ищем<select value={lookingFor} onChange={e=>setLookingFor(e.target.value)}><option value="">Всех</option><option value="male">Мужчин</option><option value="female">Женщин</option></select></label><button onClick={()=>loadProfiles().catch(e=>setError(e.message))}>Найти напарника</button></section><div className="section-title"><div><p className="eyebrow">COMMUNITY</p><h2>Люди рядом <small>{profiles.length}</small></h2></div></div><div className="profile-list">{profiles.map(p=><article className="profile-card" key={p.user_id}><div className="person-head"><div className="person-avatar">{p.first_name?.[0]}{p.last_name?.[0]}</div><div><h3>{p.first_name} {p.last_name}</h3><p>{p.city||'Город не указан'} · {p.date_of_birth?.slice(0,4)||'—'}</p></div></div><p className="bio">{p.description||'Пока ничего не рассказал о себе.'}</p><div className="chips"><span>Трудность: {grades[p.climbing.leading]||'—'}</span><span>Боулдер: {grades[p.climbing.bouldering]||'—'}</span>{p.climbing.belay>0&&<span>Страховка: {p.climbing.belay===2?'Нижняя + верхняя':'Верхняя'}</span>}</div><button className="primary full" onClick={()=>startChat(p.user_id)}>Познакомиться <b>↗</b></button></article>)}</div>{profiles.length===0&&<div className="empty">Пока никого не нашли. Попробуй изменить фильтры.</div>}</>}
       {tab==='profile'&&<ProfileScreen me={me} request={request} onSaved={async()=>{await refreshMe();setNotice('Анкета сохранена')}}/>}
-      {tab==='chats'&&<section className="chat-screen"><h1>{activeChat?'Переписка':'Сообщения'}</h1>{activeChat!==null?<><button className="text-button back" onClick={()=>setActiveChat(null)}>← Все диалоги</button><div className="messages">{messages.map(m=><div className={'bubble '+(m.sender_id===me?.id?'mine':'')} key={m.id}><p>{m.text}</p><small>{new Date(m.created_at).toLocaleString()}</small></div>)}</div><form className="send-form" onSubmit={sendMessage}><input value={draft} onChange={e=>setDraft(e.target.value)} placeholder="Сообщение…" maxLength={10000}/><button disabled={!draft.trim()}>➤</button></form></>:<div className="chat-list">{chats.map(c=><button className="chat-row" key={c.id} onClick={()=>setActiveChat(c.id)}><div className="person-avatar">CM</div><div><b>Диалог #{c.id}</b><small>Участники: {c.members.join(', ')}</small></div><span>›</span></button>)}{!chats.length&&<div className="empty">Здесь появятся ваши диалоги. Найдите напарника и начните общение.</div>}</div>}</section>}
+      {tab==='chats'&&<section className="chat-screen"><h1>{activeChat?'Переписка':'Сообщения'}</h1>{activeChat!==null?<><button className="text-button back" onClick={()=>setActiveChat(null)}>← Все диалоги</button><div className="messages">{messages.map(m=><div className={'bubble '+(m.sender_id===me?.id?'mine':'')} key={m.id}><p>{m.text}</p><small>{new Date(m.created_at).toLocaleString()} {m.sender_id===me?.id?(m.is_read?' · Прочитано':' · Доставлено'):''}</small></div>)}</div><form className="send-form" onSubmit={sendMessage}><input value={draft} onChange={e=>updateDraft(e.target.value)} placeholder="Сообщение…" maxLength={10000}/><button disabled={!draft.trim()}>➤</button></form></>:<div className="chat-list">{chats.map(c=><button className="chat-row" key={c.id} onClick={()=>setActiveChat(c.id)}><div className="person-avatar">CM</div><div><b>Диалог #{c.id}</b><small>Участники: {c.members.join(', ')}</small></div><span>›</span></button>)}{!chats.length&&<div className="empty">Здесь появятся ваши диалоги. Найдите напарника и начните общение.</div>}</div>}</section>}
     </main>
     <nav className="bottom-nav"><button className={tab==='discover'?'selected':''} onClick={()=>{setTab('discover');setActiveChat(null)}}><span>⌕</span>Поиск</button><button className={tab==='chats'?'selected':''} onClick={()=>{setTab('chats');setActiveChat(null);loadChats().catch(e=>setError(e.message))}}><span>▤</span>Чаты</button><button className={tab==='profile'?'selected':''} onClick={()=>{setTab('profile');setActiveChat(null)}}><span>◉</span>Анкета</button></nav>
   </div>
