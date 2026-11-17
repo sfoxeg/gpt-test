@@ -18,6 +18,8 @@ services:
       DATABASE_URL: postgresql+asyncpg://catchme:catchme@db:5432/catchme
       TEST_DATABASE_URL: postgresql+asyncpg://catchme:catchme@db:5432/catchme
       SECRET_KEY: change-me-before-deploy
+      # Add the deployed frontend origin(s), comma-free JSON array.
+      APP__CORS_ALLOW: '["http://localhost:5173","http://127.0.0.1:5173","http://localhost","https://localhost","capacitor://localhost"]'
     ports: ["8000:8000"]
     depends_on:
       db: { condition: service_healthy }
