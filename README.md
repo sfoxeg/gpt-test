@@ -3,7 +3,7 @@
 Migration of the original [Django vSite](https://github.com/sfoxeg/vSite) project to a separated API and SPA:
 
 - **Backend:** FastAPI, SQLAlchemy 2 async API, asyncpg, PostgreSQL, JWT bearer authentication. The backend refactor inspired by ClimDate is available on `refactor/climdate-backend-patterns`.
-- **Frontend:** React 19, Vite, TypeScript.
+- **Frontend:** React 19, Vite, TypeScript, mobile-first PWA and Capacitor 7 (iOS/Android).
 - **Infrastructure:** Docker Compose.
 
 ## Run locally
@@ -19,7 +19,7 @@ docker compose up --build
 - Swagger / OpenAPI: http://localhost:8000/docs
 - Health: http://localhost:8000/api/health
 
-The demo frontend currently provides sign-in, partner search filters, profile viewing and profile editing. Create a user through `POST /api/auth/register` in Swagger first; then sign in from the frontend.
+The frontend provides registration/login, partner search, profile editing and chat messaging. Native app setup instructions are in [frontend/README.md](frontend/README.md).
 
 ## Implemented API
 
