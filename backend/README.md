@@ -30,3 +30,15 @@ The suite covers repository persistence/search/chat flows and HTTP API registrat
 ## Runtime
 
 Run from repository root with `docker compose up --build`. API docs: http://localhost:8000/docs.
+
+## PostgreSQL + Docker integration run
+
+Run the integration suite against a real PostgreSQL container (not SQLite):
+
+```bash
+docker compose up -d db
+docker compose --profile test run --build --rm backend-tests
+docker compose down
+```
+
+The test runner applies Alembic migrations, checks the mapped schema, then runs the repository and HTTP API tests. Each pytest fixture creates a unique PostgreSQL schema and drops it afterwards, so tests do not modify the application's public schema. In CI the same Docker Compose command runs on every push to the refactor branch and pull request to main.
