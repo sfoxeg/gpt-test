@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 type Profile = { user_id:number; first_name:string; last_name:string; city:string|null; description:string; goal:number; date_of_birth:string; sex:boolean; climbing:{leading:number;bouldering:number;speed:boolean;alpinism:boolean;belay:number} }
 const levels = ['—','5','6a/a+','6b/b+','6c/c+','7a/a+','7b/b','7c/c+','8a/a+','8b/b','8c/c+','9+']
 function App() {
@@ -41,7 +41,7 @@ function App() {
 function ProfileEditor({request}:{request:(path:string,init?:RequestInit)=>Promise<any>}) {
   const [data,setData]=useState<any>(null); const [message,setMessage]=useState('')
   useEffect(()=>{request('/me').then(setData).catch(e=>setMessage(e.message))},[])
-  async function save(e:FormEvent){e.preventDefault();try{await request('/me/profile',{method:'PUT',body:JSON.stringify(data.profile)});setMessage('Анкета сохранена')}catch(e){setMessage(e instanceof Error?e.message:'Ошибка')}}
+  async function save(e:FormEvent){e.preventDefault();try{await request('/profiles/me',{method:'PUT',body:JSON.stringify({...data.profile,...data.climbing})});setMessage('Анкета сохранена')}catch(e){setMessage(e instanceof Error?e.message:'Ошибка')}}
   if(!data) return <p>{message||'Загружаем профиль…'}</p>
   return <form className="editor" onSubmit={save}><h2>Расскажи о себе</h2>{(['first_name','last_name','city','description'] as const).map(k=><label key={k}>{({first_name:'Имя',last_name:'Фамилия',city:'Город',description:'О себе'} as any)[k]}<input value={data.profile[k]||''} onChange={e=>setData({...data,profile:{...data.profile,[k]:e.target.value}})}/></label>)}<label>Цель знакомства<select value={data.profile.goal} onChange={e=>setData({...data,profile:{...data.profile,goal:Number(e.target.value)}})}><option value="0">Не в поиске</option><option value="1">Вместе полазать</option><option value="2">Больше, чем полазать</option><option value="3">За любой кипиш</option></select></label><button>Сохранить анкету</button>{message&&<p>{message}</p>}</form>
 }
