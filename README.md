@@ -2,7 +2,7 @@
 
 Migration of the original [Django vSite](https://github.com/sfoxeg/vSite) project to a separated API and SPA:
 
-- **Backend:** FastAPI, SQLAlchemy 2, PostgreSQL, JWT bearer authentication.
+- **Backend:** FastAPI, SQLAlchemy 2 async API, asyncpg, PostgreSQL, JWT bearer authentication.
 - **Frontend:** React 19, Vite, TypeScript.
 - **Infrastructure:** Docker Compose.
 
@@ -27,7 +27,7 @@ The demo frontend currently provides sign-in, partner search filters, profile vi
 - User profile and climbing preferences (lead, bouldering, speed, alpinism, belay).
 - Partner search with gender, goal, age, city, climbing-grade, belay and activity filters; page size up to 50 (default 8).
 - Chat creation, chat list, message history and sending messages with membership checks.
-- PostgreSQL persistence and containerized development environment.
+- PostgreSQL persistence with asynchronous SQLAlchemy 2 `AsyncSession` sessions and the `asyncpg` driver.
 
 ## Migration notes
 
