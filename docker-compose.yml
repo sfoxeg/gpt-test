@@ -15,7 +15,7 @@ services:
   backend:
     build: ./backend
     environment:
-      DATABASE_URL: postgresql+psycopg://catchme:catchme@db:5432/catchme
+      DATABASE_URL: postgresql+asyncpg://catchme:catchme@db:5432/catchme
       SECRET_KEY: change-me-before-deploy
     ports: ["8000:8000"]
     depends_on:
