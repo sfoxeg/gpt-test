@@ -47,12 +47,13 @@ function App(){
   useEffect(()=>{if(!token)return;Promise.all([refreshMe(),loadProfiles(),loadChats()]).catch(e=>setError(e.message))},[token,refreshMe,loadProfiles,loadChats])
   useEffect(()=>{
     if(!token)return
-    const wsBase=API.replace(/^http/,'ws').replace(/\\/api\\/v1$/,'/api/v1/ws')
+    const wsBase=API.replace(/^http/,'ws')
+    const socketUrl=(wsBase.endsWith('/api/v1')?wsBase:wsBase+'/api/v1')+'/ws'
     let disposed=false
     let retry:ReturnType<typeof setTimeout>|undefined
     const connect=()=>{
       if(disposed)return
-      const socket=new WebSocket(wsBase+'?token='+encodeURIComponent(token))
+      const socket=new WebSocket(socketUrl+'?token='+encodeURIComponent(token))
       socketRef.current=socket
       socket.onmessage=(event)=>{
         try{
