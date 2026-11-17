@@ -1,18 +1,17 @@
 """Authenticated WebSocket transport and process-local presence registry.
 
-For multi-worker deployments, replace the in-memory registry with Redis pub/sub.
+Use Redis pub/sub when running multiple backend workers or replicas.
 """
 import asyncio
-import json
 from collections import defaultdict
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from jose import JWTError, jwt
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from core.database import new_session
-from core.models import ChatMembersOrm, UsersOrm
+from core.models import ChatMembersOrm, MessagesOrm, UsersOrm
 from core.settings import settings
 
 router = APIRouter()
@@ -47,14 +46,11 @@ class ConnectionManager:
     async def send_user(self, user_id: int, event: dict[str, Any]) -> None:
         async with self._lock:
             sockets = tuple(self._connections.get(user_id, ()))
-        dead = []
         for socket in sockets:
             try:
                 await socket.send_json(event)
             except Exception:
-                dead.append(socket)
-        for socket in dead:
-            await self.disconnect(user_id, socket)
+                await self.disconnect(user_id, socket)
 
     async def send_users(self, user_ids: set[int], event: dict[str, Any]) -> None:
         await asyncio.gather(*(self.send_user(uid, event) for uid in user_ids))
@@ -69,6 +65,27 @@ async def chat_member_ids(chat_id: int) -> set[int]:
             select(ChatMembersOrm.user_id).where(ChatMembersOrm.chat_id == chat_id)
         )
         return set(result.all())
+
+
+async def broadcast_chat(chat_id: int, sender_id: int, event: dict[str, Any]) -> None:
+    await manager.send_users(await chat_member_ids(chat_id) - {sender_id}, event)
+
+
+async def _broadcast_presence(user_id: int, online: bool) -> None:
+    async with new_session() as session:
+        chat_ids = await session.scalars(
+            select(ChatMembersOrm.chat_id).where(ChatMembersOrm.user_id == user_id)
+        )
+        ids = list(chat_ids.all())
+        peers: set[int] = set()
+        if ids:
+            peer_result = await session.scalars(
+                select(ChatMembersOrm.user_id).where(
+                    ChatMembersOrm.chat_id.in_(ids), ChatMembersOrm.user_id != user_id
+                )
+            )
+            peers = set(peer_result.all())
+    await manager.send_users(peers, {"type": "presence", "user_id": user_id, "online": online})
 
 
 @router.websocket("/ws")
@@ -89,8 +106,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = ""):
         return
 
     await websocket.accept()
-    became_online = await manager.connect(user_id, websocket)
-    if became_online:
+    if await manager.connect(user_id, websocket):
         await _broadcast_presence(user_id, True)
 
     try:
@@ -98,7 +114,6 @@ async def websocket_endpoint(websocket: WebSocket, token: str = ""):
             event = await websocket.receive_json()
             if not isinstance(event, dict):
                 continue
-            kind = event.get("type")
             try:
                 chat_id = int(event.get("chat_id", 0))
             except (TypeError, ValueError):
@@ -107,41 +122,26 @@ async def websocket_endpoint(websocket: WebSocket, token: str = ""):
             if user_id not in members:
                 continue
             recipients = members - {user_id}
-            if kind == "typing":
+            if event.get("type") == "typing":
                 await manager.send_users(recipients, {
                     "type": "typing", "chat_id": chat_id, "user_id": user_id,
                     "active": bool(event.get("active", True)),
                 })
-            elif kind == "read":
+            elif event.get("type") == "read":
+                async with new_session() as session:
+                    await session.execute(
+                        update(MessagesOrm).where(
+                            MessagesOrm.chat_id == chat_id,
+                            MessagesOrm.sender_id != user_id,
+                            MessagesOrm.is_read.is_(False),
+                        ).values(is_read=True)
+                    )
+                    await session.commit()
                 await manager.send_users(recipients, {
                     "type": "messages.read", "chat_id": chat_id, "user_id": user_id,
                 })
     except WebSocketDisconnect:
         pass
     finally:
-        became_offline = await manager.disconnect(user_id, websocket)
-        if became_offline:
+        if await manager.disconnect(user_id, websocket):
             await _broadcast_presence(user_id, False)
-
-
-async def _broadcast_presence(user_id: int, online: bool) -> None:
-    async with new_session() as session:
-        result = await session.scalars(
-            select(ChatMembersOrm.user_id)
-            .join(ChatMembersOrm.__table__.alias("other"), ChatMembersOrm.chat_id == ChatMembersOrm.__table__.c.chat_id)
-            .where(ChatMembersOrm.user_id == user_id)
-        )
-        # Presence is sent to known chat peers; avoid exposing global user activity.
-        chat_ids = await session.scalars(
-            select(ChatMembersOrm.chat_id).where(ChatMembersOrm.user_id == user_id)
-        )
-        ids = list(chat_ids.all())
-        peers: set[int] = set()
-        if ids:
-            peer_result = await session.scalars(
-                select(ChatMembersOrm.user_id).where(
-                    ChatMembersOrm.chat_id.in_(ids), ChatMembersOrm.user_id != user_id
-                )
-            )
-            peers = set(peer_result.all())
-    await manager.send_users(peers, {"type": "presence", "user_id": user_id, "online": online})
