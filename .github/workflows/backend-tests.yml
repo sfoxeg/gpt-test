@@ -5,9 +5,14 @@ on:
     branches:
       - main
       - refactor/climdate-backend-patterns
+      - feature/realtime-chat
   pull_request:
     branches:
       - main
+
+env:
+  POSTGRES_PASSWORD: ci-test-password
+  SECRET_KEY: ci-test-secret-key-at-least-32-characters-long
 
 jobs:
   postgres-docker:
