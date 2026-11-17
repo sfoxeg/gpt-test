@@ -7,6 +7,7 @@ React + TypeScript + Vite mobile-first client. One codebase supports browser/PWA
 - Profile load/update via `/api/v1/me` and `/api/v1/profiles/me`
 - Filtered partner discovery via `/api/v1/profiles`
 - Chat creation, list, history and sending via `/api/v1/chats`
+- Live messages, peer presence, typing state and read receipts via authenticated WebSocket `/api/v1/ws` with automatic reconnect
 - Token persistence through Capacitor Preferences with a web localStorage fallback
 
 ## Web development
@@ -39,4 +40,4 @@ npm run cap:android
 npm run cap:ios
 ```
 
-Set `VITE_API_URL` at build time to a publicly reachable HTTPS API endpoint before building mobile binaries. Do not use localhost for a device build: localhost points to the phone itself. Configure FastAPI CORS for your deployed web origin and the Capacitor app origins. Native platform directories are generated locally and are not committed until signing, icons, splash screens and deployment settings are configured.
+Set `VITE_API_URL` at build time to a publicly reachable HTTPS API endpoint before building mobile binaries. Do not use localhost for a device build: localhost points to the phone itself. WebSocket traffic automatically switches to WSS when the API URL uses HTTPS. Browser, Android WebView and iOS WKWebView use the platform WebSocket implementation; native device verification still requires building and running on physical/simulator devices. Configure FastAPI CORS for your deployed web origin and the Capacitor app origins. Native platform directories are generated locally and are not committed until signing, icons, splash screens and deployment settings are configured.
