@@ -2,9 +2,9 @@ from datetime import date, datetime, timezone
 from sqlalchemy import Boolean, Date, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.models.base import Base
-from core.models.mixins import IdPKMixin, CreatedAtMixin
+from core.models.mixins import IdPKMixin
 
-class UsersOrm(IdPKMixin, CreatedAtMixin, Base):
+class UsersOrm(IdPKMixin, Base):
     __tablename__ = "users"
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
