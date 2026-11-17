@@ -2,7 +2,7 @@
 
 Migration of the original [Django vSite](https://github.com/sfoxeg/vSite) project to a separated API and SPA:
 
-- **Backend:** FastAPI, SQLAlchemy 2 async API, asyncpg, PostgreSQL, JWT bearer authentication.
+- **Backend:** FastAPI, SQLAlchemy 2 async API, asyncpg, PostgreSQL, JWT bearer authentication. The backend refactor inspired by ClimDate is available on `refactor/climdate-backend-patterns`.
 - **Frontend:** React 19, Vite, TypeScript.
 - **Infrastructure:** Docker Compose.
 
