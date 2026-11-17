@@ -1,0 +1,40 @@
+name: Backend integration tests
+
+on:
+  push:
+    branches:
+      - main
+      - refactor/climdate-backend-patterns
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  postgres-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start PostgreSQL and wait for health
+        run: docker compose up -d db
+      - name: Build backend image and run migrations, schema check and integration tests
+        run: docker compose --profile test run --build --rm backend-tests
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop containers
+        if: always()
+        run: docker compose down -v
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+      - name: Type-check and build web application
+        working-directory: frontend
+        run: npm run build
