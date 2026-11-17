@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from sqlalchemy import Boolean, Date, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from core.models.base import Base
@@ -11,6 +11,6 @@ class UsersOrm(IdPKMixin, Base):
     sex: Mapped[bool] = mapped_column(Boolean, default=False)
     date_of_birth: Mapped[date] = mapped_column(Date)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    date_joined: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    date_joined: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     profile: Mapped["ProfilesOrm"] = relationship(back_populates="user", uselist=False, cascade="all, delete-orphan")
     messages: Mapped[list["MessagesOrm"]] = relationship(back_populates="sender")
