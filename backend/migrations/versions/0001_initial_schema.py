@@ -16,7 +16,7 @@ def upgrade():
         sa.Column("date_of_birth", sa.Date(), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column("date_joined", sa.DateTime(), nullable=False, server_default=sa.func.now()),
-        sa.UniqueConstraint("email", name="uq_users_email"))
+        )
     op.create_index("ix_users_email", "users", ["email"], unique=True)
     op.create_table("profiles",
         sa.Column("user_id", sa.Integer(), nullable=False),
@@ -51,7 +51,7 @@ def upgrade():
         sa.Column("joined", sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.ForeignKeyConstraint(["chat_id"], ["chats.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.UniqueConstraint("chat_id", "user_id", name="uq_chat_members_chat_user"))
+        sa.UniqueConstraint("chat_id", "user_id", name="uq_chat_members_chat_id_user_id"))
     op.create_table("messages",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column("chat_id", sa.Integer(), nullable=False),
