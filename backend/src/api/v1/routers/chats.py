@@ -13,7 +13,10 @@ async def create_chat(other_user_id: int, user_id: Annotated[int, Depends(get_cu
 
 @router.get("")
 async def list_chats(user_id: Annotated[int, Depends(get_current_user_id)]):
-    return await ChatsRepository.list_for_user(user_id)
+    chats = await ChatsRepository.list_for_user(user_id)
+    for chat in chats:
+        chat["online"] = {str(member_id): await manager.online(member_id) for member_id in chat["members"] if member_id != user_id}
+    return chats
 
 @router.get("/{chat_id}/messages")
 async def list_messages(chat_id: int, user_id: Annotated[int, Depends(get_current_user_id)]):
