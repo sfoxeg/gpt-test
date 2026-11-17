@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 type Profile = { user_id:number; first_name:string; last_name:string; city:string|null; description:string; goal:number; date_of_birth:string; sex:boolean; climbing:{leading:number;bouldering:number;speed:boolean;alpinism:boolean;belay:number} }
