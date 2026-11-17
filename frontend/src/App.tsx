@@ -47,23 +47,32 @@ function App(){
   useEffect(()=>{if(!token)return;Promise.all([refreshMe(),loadProfiles(),loadChats()]).catch(e=>setError(e.message))},[token,refreshMe,loadProfiles,loadChats])
   useEffect(()=>{
     if(!token)return
-    const wsBase=API.replace(/^http/,'ws').replace(/\/api\/v1$/,'/api/v1/ws')
-    const socket=new WebSocket(wsBase+'?token='+encodeURIComponent(token))
-    socketRef.current=socket
-    socket.onmessage=(event)=>{
-      try{
-        const data=JSON.parse(event.data)
-        if(data.type==='message' && data.message){
-          const incoming=data.message as Message
-          if(activeChat===incoming.chat_id)setMessages(old=>old.some(m=>m.id===incoming.id)?old:[...old,incoming])
-          else loadChats().catch(()=>{})
-        }else if(data.type==='presence')setPresence(old=>({...old,[String(data.user_id)]:!!data.online}))
-        else if(data.type==='messages.read' && activeChat===data.chat_id)setMessages(old=>old.map(m=>m.sender_id===me?.id?{...m,is_read:true}:m))
-        else if(data.type==='typing' && activeChat===data.chat_id)setTypingUser(data.active?data.user_id:null)
-      }catch{/* Ignore malformed socket frames. */}
+    const wsBase=API.replace(/^http/,'ws').replace(/\\/api\\/v1$/,'/api/v1/ws')
+    let disposed=false
+    let retry:ReturnType<typeof setTimeout>|undefined
+    const connect=()=>{
+      if(disposed)return
+      const socket=new WebSocket(wsBase+'?token='+encodeURIComponent(token))
+      socketRef.current=socket
+      socket.onmessage=(event)=>{
+        try{
+          const data=JSON.parse(event.data)
+          if(data.type==='message' && data.message){
+            const incoming=data.message as Message
+            if(activeChat===incoming.chat_id)setMessages(old=>old.some(m=>m.id===incoming.id)?old:[...old,incoming])
+            else loadChats().catch(()=>{})
+          }else if(data.type==='presence')setPresence(old=>({...old,[String(data.user_id)]:!!data.online}))
+          else if(data.type==='messages.read' && activeChat===data.chat_id)setMessages(old=>old.map(m=>m.sender_id===me?.id?{...m,is_read:true}:m))
+          else if(data.type==='typing' && activeChat===data.chat_id)setTypingUser(data.active?data.user_id:null)
+        }catch{/* Ignore malformed socket frames. */}
+      }
+      socket.onclose=()=>{
+        if(socketRef.current===socket)socketRef.current=null
+        if(!disposed)retry=setTimeout(connect,2000)
+      }
     }
-    socket.onclose=()=>{if(socketRef.current===socket)socketRef.current=null}
-    return ()=>{socket.close();if(socketRef.current===socket)socketRef.current=null}
+    connect()
+    return ()=>{disposed=true;if(retry)clearTimeout(retry);socketRef.current?.close();socketRef.current=null}
   },[token,activeChat,me?.id,loadChats])
 
   useEffect(()=>{if(activeChat!==null){loadMessages(activeChat).catch(e=>setError(e.message));request('/chats/'+activeChat+'/presence').then(setPresence).catch(()=>{})}},[activeChat,loadMessages,request])
