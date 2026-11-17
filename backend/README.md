@@ -1,19 +1,17 @@
-# Backend
+# CatchMe backend
 
-The API uses FastAPI with SQLAlchemy 2 async sessions and the asyncpg PostgreSQL driver.
+Backend architecture is based on the layered style used in ClimDate:
 
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
+- `api/v1/routers`: HTTP routing and request/response boundaries.
+- `core/repositories`: async database operations and persistence queries.
+- `core/models`: SQLAlchemy ORM entities, declarative base and mixins.
+- `core/schemas`: Pydantic request/response contracts.
+- `core/settings`: separate application and database configuration.
+- `core/dependencies.py`: authentication dependencies.
+- `core/database.py`: async engine and session factory.
 
-Set `DATABASE_URL` and `SECRET_KEY` in the environment. For PostgreSQL, use the async URL format:
+All database access uses SQLAlchemy async sessions via `async with new_session()`; PostgreSQL uses asyncpg.
 
-```text
-postgresql+asyncpg://user:password@localhost:5432/database
-```
+Run with Docker Compose from the repository root. API docs: http://localhost:8000/docs.
 
-Interactive API docs: http://localhost:8000/docs.
-
-Database access is performed with `AsyncSession`, `await db.execute()`, `await db.commit()` and related async SQLAlchemy methods. Tables are created at application startup for this initial scaffold; use Alembic migrations before production.
+Alembic is included as the migration dependency. Before production, add and apply migrations rather than relying on the development `create_all` bootstrap.
