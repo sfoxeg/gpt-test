@@ -1,4 +1,3 @@
-import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -28,11 +27,11 @@ app.add_middleware(
     # Production frontend domains must be listed explicitly in APP__CORS_ALLOW.
     allow_origin_regex=(
         r"^https?://("
-        r"localhost|127(?:\\.\\d{1,3}){3}|"
-        r"10(?:\\.\\d{1,3}){3}|"
-        r"192\\.168(?:\\.\\d{1,3}){2}|"
-        r"172\\.(?:1[6-9]|2\\d|3[01])(?:\\.\\d{1,3}){2}"
-        r")(?:\\:\\d+)?$"
+        r"localhost|127(?:\.\d{1,3}){3}|"
+        r"10(?:\.\d{1,3}){3}|"
+        r"192\.168(?:\.\d{1,3}){2}|"
+        r"172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}"
+        r")(?:\:\d+)?$"
     ),
     allow_credentials=True,
     allow_methods=["*"],
