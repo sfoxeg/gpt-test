@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from .database import get_db, settings
-from .models import User
+from .models import Profile, User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -55,7 +55,7 @@ async def current_user(
         select(User)
         .where(User.id == user_id)
         .options(
-            selectinload(User.profile).selectinload("climbing")
+            selectinload(User.profile).selectinload(Profile.climbing)
         )
     )
     user = result.scalar_one_or_none()
