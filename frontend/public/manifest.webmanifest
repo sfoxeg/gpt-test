@@ -1,0 +1,11 @@
+{
+  "name": "CatchMe — Climbing partners",
+  "short_name": "CatchMe",
+  "description": "Найди напарника для скалолазания",
+  "lang": "ru",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f5f0",
+  "theme_color": "#202d26",
+  "icons": []
+}
